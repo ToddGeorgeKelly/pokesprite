@@ -42,6 +42,13 @@ EMPTY_PLACEHOLDER = '–'
 # Global sprite counter for the leftmost column
 _n_counter = None
 
+def flatten(items, seqtypes=(list, tuple)):
+  '''Flattens a list.'''
+  for i, x in enumerate(items):
+    while i < len(items) and isinstance(items[i], seqtypes):
+      items[i:i+1] = items[i]
+  return items
+
 def generate_index_page(version, commit):
   '''Generates the index page'''
   old_links = [
@@ -62,7 +69,7 @@ def generate_index_page(version, commit):
         <p><img class="banner" src="%(example_image)s" width="%(example_image_width)s" /></p>
         <p>See the <a href="%(project_url)s">project page on Github</a> for more information.</a></p>
         <h3>Legacy images</h3>
-        <p>As of Feb 2020, this project is up-to-date with Gen 8 (Pokémon Sword/Shield). All old images from Gen 7 (Pokémon Ultra Sun/Ultra Moon) are still available for legacy support.</p>
+        <p>As of Feb 2020, this project is up-to-date with Gen 8 (Pokémon Sword/Shield and its DLC). All old images from Gen 7 (Pokémon Ultra Sun/Ultra Moon) are still available for legacy support.</p>
         <p><strong>Archived versions of the legacy overview pages:</strong></p>
         <ul>
           %(old_links)s
@@ -131,7 +138,7 @@ def wrap_docs_page(table_content, gen, gen_dir, curr_page, json_file, title, is_
         %(main_info)s
         <p>See the <a href="%(project_url)s">project page on Github</a> for more information.</a></p>
       </div>
-      <table class="pokesprite%(gen)s">
+      <table class="pokesprite">
         %(table_content)s
       </table>
       <div class="text-section last">
@@ -243,7 +250,7 @@ def read_data():
     'etc': read_json_file(ETC_JSON)
   }
 
-def get_pkm_form(form_name, form_alias, is_unofficial_icon):
+def get_pkm_form(form_name, form_alias, is_unofficial_icon, is_female, has_unofficial_female_icon):
   title = []
   daggers = []
 
@@ -253,6 +260,9 @@ def get_pkm_form(form_name, form_alias, is_unofficial_icon):
     daggers.append('†')
   if is_unofficial_icon:
     title.append('Unofficial icon (see below)')
+    daggers.append('‡')
+  if is_female and has_unofficial_female_icon:
+    title.append('Unofficial female icon (see below)')
     daggers.append('‡')
 
   if len(title):
@@ -329,7 +339,7 @@ def get_td_node(td):
         node = col['node']
         expl = col['expl']
         cls = col['cls']
-        cols.append(f'<td title="{expl}" class="min{cls}">{node}</td>')
+        cols.append(f'<td title="{expl}" class="form-badge min{cls}"><span>{node}</span></td>')
       else:
         cols.append(f'<td class="min">{col}</td>')
     return ''.join(cols)
@@ -340,9 +350,12 @@ def get_td_node(td):
 
 def get_img_node(url, name, form_name, type, retina_type = None):
   form_name = html.escape(form_name)
-  cls = [type, 'retina-' + retina_type if retina_type else '']
+  cls = [type, 'retina retina-' + retina_type if retina_type else '']
   cls = ' '.join(cls).strip()
   return f'<img class="{cls}" src="{url}" alt="{form_name}" />'
+
+def get_gen_str(str):
+  return str.capitalize() if 'gen-' not in str else ('Gen ' + str.split('-')[1])
 
 def reset_counter():
   '''Resets the global sprite counter'''
@@ -372,21 +385,21 @@ def determine_form(slug, form_name, form_data):
 
   return (form_slug_file, form_slug_display, form_alias)
 
-def append_pkm(cols, base, slug_display, slug_file, form_name, form_alias, has_female, is_female, is_right, is_unofficial_icon, is_prev_gen_icon, docs_gen):
+def append_pkm(cols, base, slug_display, slug_file, form_name, form_alias, has_female, has_unofficial_female_icon, is_female, is_right, is_unofficial_icon, is_prev_gen_icon, docs_gen):
   '''Adds a single Pokémon row'''
   cols.append([
     get_counter(),
     get_img_node(get_pkm_url(base, slug_file, False, is_female, is_right), None, form_name, 'p'),
     get_img_node(get_pkm_url(base, slug_file, True, is_female, is_right), None, form_name, 'p'),
-    [get_pkm_form(form_name, form_alias, is_unofficial_icon), get_pkm_gender(is_female, has_female), get_pkm_gen(is_prev_gen_icon, docs_gen)],
+    [get_pkm_form(form_name, form_alias, is_unofficial_icon, is_female, has_unofficial_female_icon), get_pkm_gender(is_female, has_female), get_pkm_gen(is_prev_gen_icon, docs_gen)],
     f'<code>{slug_display}</code>'
   ])
 
-def append_pkm_form(cols, base, slug_display, slug_file, form_name, form_alias, has_female, has_right, add_female, add_right, is_unofficial_icon, is_prev_gen_icon, docs_gen):
+def append_pkm_form(cols, base, slug_display, slug_file, form_name, form_alias, has_female, has_unofficial_female_icon, has_right, add_female, add_right, is_unofficial_icon, is_prev_gen_icon, docs_gen):
   '''Adds columns for a single form: at least two, then female sprites, then right-facing sprites'''
-  append_pkm(cols, base, slug_display, slug_file, form_name, form_alias, has_female, False, False, is_unofficial_icon, is_prev_gen_icon, docs_gen)
-  if has_female and add_female: append_pkm(cols, base, slug_display, slug_file, form_name, form_alias, has_female, True, False, is_unofficial_icon, is_prev_gen_icon, docs_gen)
-  if has_right and add_right: append_pkm(cols, base, slug_display, slug_file, form_name, form_alias, has_female, False, True, is_unofficial_icon, is_prev_gen_icon, docs_gen)
+  append_pkm(cols, base, slug_display, slug_file, form_name, form_alias, has_female, has_unofficial_female_icon, False, False, is_unofficial_icon, is_prev_gen_icon, docs_gen)
+  if has_female and add_female: append_pkm(cols, base, slug_display, slug_file, form_name, form_alias, has_female, has_unofficial_female_icon, True, False, is_unofficial_icon, is_prev_gen_icon, docs_gen)
+  if has_right and add_right: append_pkm(cols, base, slug_display, slug_file, form_name, form_alias, has_female, has_unofficial_female_icon, False, True, is_unofficial_icon, is_prev_gen_icon, docs_gen)
 
 def generate_misc_table(misc, meta, curr_page, json_file, version = '[unknown]', commit = '[unknown]'):
   '''Generates a documentation table for miscellaneous sprites'''
@@ -395,7 +408,7 @@ def generate_misc_table(misc, meta, curr_page, json_file, version = '[unknown]',
   # each one containing one item with potentially multiple sprites.
   reset_counter()
   groups = meta['misc-groups']
-  order = ['ribbon', 'body-style']
+  order = list(meta['misc-groups'].keys())
   base_url = REPO_BASE_URL
 
   # List of items to display in the opening text.
@@ -409,42 +422,162 @@ def generate_misc_table(misc, meta, curr_page, json_file, version = '[unknown]',
   buffer.append('</thead>')
   buffer.append('<tbody>')
 
-  # Ribbons
-  buffer.append('<tbody>')
-  buffer.append('<tr><th></th><td colspan="6" class="group" id="ribbon">%s</td></tr>' % groups['ribbon']['name']['eng'])
-  buffer.append('</tbody>')
-  buffer.append('<tbody>')
-  buffer.append('<tr class="header"><th>#</th><th>Name</th><th>名前</th><th>Origin</th><th>Sprite</th><th colspan="2">Filename/gen</th></tr>')
-  buffer.append('</tbody>')
+  # Ribbons and marks
+  for misc_set in ['ribbon', 'mark', 'special-attribute']:
+    buffer.append('<tbody>')
+    buffer.append('<tr><th></th><th colspan="6" class="group" id="%s">%s</th></tr>' % (misc_set, groups[misc_set]['name']['eng']))
+    buffer.append('</tbody>')
+    buffer.append('<tbody>')
+    buffer.append('<tr class="header"><th>#</th><th>Name</th><th>名前</th><th>Origin</th><th>Sprite</th><th colspan="2">Filename/gen</th></tr>')
+    buffer.append('</tbody>')
 
-  for item in misc['ribbon']:
+    for item in misc[misc_set]:
+      name = item['name']
+      name_eng = name['eng']
+      name_jpn = name['jpn']
+      name_jpn_ro = name['jpn_ro']
+      origin_gen = item['origin_gen']
+      desc = item.get('description', {})
+      desc_eng = desc.get('eng')
+      desc_gen = desc.get('from_gen')
+      desc_eng_esc = html.escape(desc_eng) if desc_eng else ''
+      name_eng_desc = f'<attr title="{desc_eng_esc}">{name_eng}</attr>' if desc_eng else name_eng
+      row_n = 0
+      files = item['files'].items()
+      buffer.append('<tbody class="alternating">')
+      images = flatten([[item['files'][n]] for n in item['files']])
+      for k, vs in files:
+        vs = vs if isinstance(vs, list) else [vs]
+        gen_row_n = 0
+        for v in vs:
+          count = get_counter()
+          gen_n = get_gen_str(k)
+          res = item['resolution'][k]
+          retina_type = \
+            'ribbon-gen8' if (res == '2x' and misc_set in ['ribbon', 'mark']) else \
+            None
+          buffer.append('<tr class="variable-height">')
+          buffer.append(f'<td>{count}</td>')
+          if row_n == 0:
+            rows = len(files)
+            rowspan = f' rowspan="{len(images)}"' if len(images) > 1 else ''
+            buffer.append(f'<td{rowspan}>{name_eng_desc}</td>')
+            buffer.append(f'<td{rowspan}>{name_jpn}</td>')
+            buffer.append(f'<td{rowspan}>Gen {origin_gen}</td>')
+          buffer.append('<td class="image item">' + get_img_node(get_misc_url(base_url, v), None, f"Sprite for '{name_eng}'", 'm', retina_type) + '</td>')
+          buffer.append(f'<td class="filler{" last-item" if len(vs) > 1 and row_n > 0 else ""}"><code>{v}</code></td>')
+          if len(vs) > 1:
+            if gen_row_n == 0:
+              rowspan = f' rowspan="{len(vs)}"'
+              buffer.append(f'<td{rowspan}>{gen_n}</td>')
+          else:
+            buffer.append(f'<td>{gen_n}</td>')
+          buffer.append('</tr>')
+          sprites_counter += 1
+          gen_row_n += 1
+          row_n += 1
+      buffer.append('</tbody>')
+
+  # Types and type logos
+  buffer.append('<tbody>')
+  buffer.append('<tr><th></th><th colspan="6" class="group" id="types">%s</th></tr>' % groups['types']['name']['eng'])
+  buffer.append('</tbody>')
+  buffer.append('<tbody>')
+  buffer.append('<tr class="header"><th>#</th><th>Type</th><th colspan="2">タイプ</th><th>Sprite</th><th colspan="3">Filename/source</th></tr>')
+  buffer.append('</tbody>')
+  for item in misc['types']:
     name = item['name']
     name_eng = name['eng']
     name_jpn = name['jpn']
-    name_jpn_ro = name['jpn_ro']
-    origin_gen = item['origin_gen']
-    desc = item['description']
-    desc_eng = desc['eng']
-    desc_gen = desc['from_gen']
-    desc_eng_esc = html.escape(desc_eng)
-    name_eng_desc = f'<attr title="{desc_eng_esc}">{name_eng}</attr>'
     row_n = 0
     files = item['files'].items()
     buffer.append('<tbody class="alternating">')
     for k, v in files:
       count = get_counter()
-      gen_n = k.split('-')[1]
+      gen_n = get_gen_str(k)
       buffer.append('<tr class="variable-height">')
       buffer.append(f'<td>{count}</td>')
       if row_n == 0:
         rows = len(files)
         rowspan = f' rowspan="{rows}"' if rows > 1 else ''
-        buffer.append(f'<td{rowspan}>{name_eng_desc}</td>')
-        buffer.append(f'<td{rowspan}>{name_jpn}</td>')
-        buffer.append(f'<td{rowspan}>Gen {origin_gen}</td>')
-      buffer.append('<td class="image item">' + get_img_node(get_misc_url(base_url, v), None, f"Sprite for '{name_eng}'", 'm', 'ribbon-gen8' if gen_n == '8' else None) + '</td>')
-      buffer.append(f'<td class="filler"><code>{v}</code></td>')
-      buffer.append(f'<td>Gen {gen_n}</td>')
+        buffer.append(f'<td{rowspan}>{name_eng.capitalize()}</td>')
+        buffer.append(f'<td{rowspan} colspan="2">{name_jpn}</td>')
+      buffer.append('<td class="image item">' + get_img_node(get_misc_url(base_url, v), None, f"Sprite for '{name_eng}'", 'm', 'body-style-gen8') + '</td>')
+      buffer.append(f'<td class="filler" colspan="1"><code>{v}</code></td>')
+      buffer.append(f'<td>{gen_n}</td>')
+      buffer.append('</tr>')
+      sprites_counter += 1
+      row_n += 1
+    buffer.append('</tbody>')
+
+  buffer.append('<tbody>')
+  buffer.append('<tr><th></th><th colspan="6" class="group" id="type-logos">%s</th></tr>' % groups['type-logos']['name']['eng'])
+  buffer.append('</tbody>')
+  buffer.append('<tbody>')
+  buffer.append('<tr class="header"><th>#</th><th>Type</th><th colspan="2">タイプ</th><th>Sprite</th><th colspan="3">Filename/source</th></tr>')
+  buffer.append('</tbody>')
+  for item in misc['type-logos']:
+    name = item['name']
+    name_eng = name['eng']
+    name_jpn = name['jpn']
+    row_n = 0
+    files = item['files'].items()
+    buffer.append('<tbody class="alternating">')
+    for k, v in files:
+      count = get_counter()
+      gen_n = get_gen_str(k)
+      colors = item['colors'][k]
+      main_color = colors[0]
+      buffer.append('<tr class="variable-height">')
+      buffer.append(f'<td>{count}</td>')
+      if row_n == 0:
+        rows = len(files)
+        rowspan = f' rowspan="{rows}"' if rows > 1 else ''
+        buffer.append(f'<td{rowspan}>{name_eng.capitalize()}</td>')
+        buffer.append(f'<td{rowspan} colspan="2">{name_jpn}</td>')
+      
+      buffer.append('<td class="image item type-icon-' + name_eng + '">' + \
+        f'<style>tr:hover .type-icon-{name_eng} {{ background: {main_color} !important; }} tr:hover .type-icon-{name_eng} img {{ filter: brightness(100); }}</style>' + \
+        get_img_node(get_misc_url(base_url, v), None, f"Sprite for '{name_eng}'", 'm', 'body-style-gen8') + '</td>')
+      buffer.append(f'<td class="filler" colspan="1"><code>{v}</code></td>')
+      buffer.append(f'<td>{gen_n}</td>')
+      buffer.append('</tr>')
+      sprites_counter += 1
+      row_n += 1
+    buffer.append('</tbody>')
+
+  # Seals
+  buffer.append('<tbody>')
+  buffer.append('<tr><th></th><th colspan="6" class="group" id="seals">%s</th></tr>' % groups['seals']['name']['eng'])
+  buffer.append('</tbody>')
+  buffer.append('<tbody>')
+  buffer.append('<tr class="header"><th>#</th><th>Type</th><th colspan="2">タイプ</th><th>Sprite</th><th colspan="3">Filename/source</th></tr>')
+  buffer.append('</tbody>')
+  for item in misc['seals']:
+    name = item['name']
+    name_eng = name['eng']
+    name_jpn = name['jpn']
+    row_n = 0
+    files = item['files'].items()
+    buffer.append('<tbody class="alternating">')
+    for k, v in files:
+      count = get_counter()
+      gen_n = get_gen_str(k)
+      res = item['resolution'][k]
+      retina_type = \
+        'seal-3x' if res == '3x' else \
+        'seal-2x' if res == '2x' else \
+        None
+      buffer.append('<tr class="variable-height">')
+      buffer.append(f'<td>{count}</td>')
+      if row_n == 0:
+        rows = len(files)
+        rowspan = f' rowspan="{rows}"' if rows > 1 else ''
+        buffer.append(f'<td{rowspan}>{name_eng.capitalize()}</td>')
+        buffer.append(f'<td{rowspan} colspan="2">{name_jpn}</td>')
+      buffer.append('<td class="image item">' + get_img_node(get_misc_url(base_url, v), None, f"Sprite for '{name_eng}'", 'm', retina_type) + '</td>')
+      buffer.append(f'<td class="filler" colspan="1"><code>{v}</code></td>')
+      buffer.append(f'<td>{gen_n}</td>')
       buffer.append('</tr>')
       sprites_counter += 1
       row_n += 1
@@ -452,7 +585,7 @@ def generate_misc_table(misc, meta, curr_page, json_file, version = '[unknown]',
   
   # Body styles
   buffer.append('<tbody>')
-  buffer.append('<tr><th></th><td colspan="6" class="group" id="body-style">%s</td></tr>' % groups['body-style']['name']['eng'])
+  buffer.append('<tr><th></th><th colspan="6" class="group" id="body-style">%s</th></tr>' % groups['body-style']['name']['eng'])
   buffer.append('</tbody>')
   buffer.append('<tbody>')
   buffer.append('<tr class="header"><th>#</th><th>Type</th><th colspan="2">種類</th><th>Sprite</th><th colspan="3">Filename/gen</th></tr>')
@@ -467,7 +600,7 @@ def generate_misc_table(misc, meta, curr_page, json_file, version = '[unknown]',
     buffer.append('<tbody class="alternating">')
     for k, v in files:
       count = get_counter()
-      gen_n = k.split('-')[1]
+      gen_n = get_gen_str(k)
       buffer.append('<tr class="variable-height">')
       buffer.append(f'<td>{count}</td>')
       if row_n == 0:
@@ -475,9 +608,9 @@ def generate_misc_table(misc, meta, curr_page, json_file, version = '[unknown]',
         rowspan = f' rowspan="{rows}"' if rows > 1 else ''
         buffer.append(f'<td{rowspan}>{name_eng}</td>')
         buffer.append(f'<td{rowspan} colspan="2">{name_jpn}</td>')
-      buffer.append('<td class="image item">' + get_img_node(get_misc_url(base_url, v), None, f"Sprite for '{name_eng}'", 'm', 'body-style-gen8') + '</td>')
+      buffer.append('<td class="image item">' + get_img_node(get_misc_url(base_url, v), None, f"Sprite for '{name_eng}'", 'm', 'body-style-gen8' if k == 'gen-8' else '') + '</td>')
       buffer.append(f'<td class="filler" colspan="1"><code>{v}</code></td>')
-      buffer.append(f'<td>Gen {gen_n}</td>')
+      buffer.append(f'<td>{gen_n}</td>')
       buffer.append('</tr>')
       sprites_counter += 1
       row_n += 1
@@ -542,7 +675,7 @@ def generate_items_table(itm, itm_unl, inv, etc, dirs, curr_page, json_file, ver
     if not len(items): continue
     title = inv['item-groups'].get(group, None)
     title = title['name']['eng'] if title else group.title()
-    buffer.append(f'<tr><td></td><td colspan="7" class="group">{title}</td></tr>')
+    buffer.append(f'<tr><th></th><th colspan="7" class="group">{title}</th></tr>')
     for item in items:
       count = get_counter()
       name = item['name']
@@ -597,7 +730,7 @@ def generate_dex_table(dex, etc, gen, gen_dir, curr_page, json_file, add_female 
   buffer.append('<tr class="title"><th></th><th colspan="10">Gen %(gen)s sprite overview table%(subtype)s<br /><span>pokesprite-images v%(version)s %(commit)s</span></th></tr>' % { 'subtype': ' (new sprites only)' if new_sprites_only else '', 'gen': gen, 'version': version, 'commit': commit })
   buffer.append('<tr class="header"><th>#</th><th>Dex</th><th>Name</th><th colspan="2">名前/ローマ字</th><th colspan="2">Sprites</th><th colspan="3">Form</th><th>Slug</th></tr>')
   buffer.append('</thead>')
-  buffer.append('<tbody>')
+  buffer.append('<tbody class="gen%(gen)s">' % { 'gen': gen })
 
   # Loop over each Pokémon and generate rows for each of its forms, one regular and one shiny,
   # including gender differences and right-facing sprites.
@@ -629,6 +762,7 @@ def generate_dex_table(dex, etc, gen, gen_dir, curr_page, json_file, add_female 
         form_name_clean,
         form_alias,
         form_data.get('has_female', False),
+        form_data.get('has_unofficial_female_icon', False),
         form_data.get('has_right', False),
         add_female,
         add_right,
